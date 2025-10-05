@@ -442,6 +442,49 @@ async def receive_cases_bulk(cases_data: List[CaseBulkImport]):
     
     return {"created_cases": len(created_cases), "case_ids": created_cases}
 
+# AI Routes
+@api_router.post("/cases/{case_id}/generate-summaries")
+async def generate_summaries(case_id: str, current_user: User = Depends(get_current_user)):
+    """Generate AI summaries for a specific case"""
+    case = await db.cases.find_one({"id": case_id})
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    # Generate summaries using AI
+    summaries = await generate_case_summaries(case["full_text"], case["title"])
+    
+    # Update case with generated summaries
+    await db.cases.update_one(
+        {"id": case_id},
+        {
+            "$set": {
+                "short_summary": summaries["short_summary"],
+                "medium_summary": summaries["medium_summary"],
+                "detailed_analysis": summaries["detailed_analysis"],
+                "tags": summaries["tags"],
+                "outcome": summaries["outcome"],
+                "ai_generated": True,
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    
+    return {"message": "Summaries generated successfully", "summaries": summaries}
+
+@api_router.post("/ai/generate-draft")
+async def generate_draft(request: AIDraftRequest, current_user: User = Depends(get_current_user)):
+    """Generate AI draft from case summary"""
+    # Check if user has access to AI draft feature
+    if current_user.subscription_plan not in ["plan_2", "plan_3"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="AI Draft Assistant is available for Plan 2 and Plan 3 subscribers only"
+        )
+    
+    draft = await generate_ai_draft(request.summary_text, request.draft_type)
+    
+    return {"draft": draft, "draft_type": request.draft_type}
+
 @api_router.get("/")
 async def root():
     return {"message": "AdvoDraft Legal Feed API", "version": "1.0.0"}
