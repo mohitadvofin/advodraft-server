@@ -157,7 +157,12 @@ async def check_subscription_status(user: User):
     
     # Check free trial
     if user.subscription_plan == "free_trial":
-        if now > user.trial_end_date:
+        trial_end = user.trial_end_date
+        # Ensure trial_end_date is timezone aware
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+            
+        if now > trial_end:
             # Trial expired, update user status
             await db.users.update_one(
                 {"id": user.id},
