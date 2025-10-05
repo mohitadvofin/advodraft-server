@@ -3,7 +3,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import os
 import logging
@@ -13,6 +12,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 import jwt
 import asyncio
+import bcrypt
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
