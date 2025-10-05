@@ -1,0 +1,17 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+cases_db = []
+
+@app.route("/send_cases", methods=["POST"])
+def send_cases():
+    new_cases = request.json
+    cases_db.extend(new_cases)
+    return jsonify({"status":"ok","total_cases":len(cases_db)})
+
+@app.route("/get_cases", methods=["GET"])
+def get_cases():
+    return jsonify(cases_db)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
