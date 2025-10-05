@@ -164,6 +164,140 @@ async def check_subscription_status(user: User):
     
     return user.subscription_active
 
+# AI Integration Functions
+async def generate_case_summaries(case_text: str, case_title: str):
+    """Generate AI summaries for legal case"""
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        
+        # Initialize AI chat
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"case_summary_{uuid.uuid4()}",
+            system_message="You are an expert legal analyst specializing in GST and Income Tax law. Generate precise, professional case summaries."
+        ).with_model("openai", "gpt-5")
+
+        # Generate short summary (≤50 words)
+        short_prompt = f"""
+        Analyze this legal case and provide a SHORT SUMMARY in exactly 50 words or less:
+
+        Case Title: {case_title}
+        Case Text: {case_text[:2000]}...
+
+        Focus on: Key legal issue, court decision, and impact. Be precise and professional.
+        """
+        
+        short_message = UserMessage(text=short_prompt)
+        short_summary = await chat.send_message(short_message)
+
+        # Generate medium summary (≤150 words)  
+        medium_prompt = f"""
+        Analyze this legal case and provide a MEDIUM SUMMARY in exactly 150 words or less:
+
+        Case Title: {case_title}
+        Case Text: {case_text[:3000]}...
+
+        Include: Legal issue, facts, court's reasoning, decision, and implications. Be comprehensive yet concise.
+        """
+        
+        medium_message = UserMessage(text=medium_prompt)
+        medium_summary = await chat.send_message(medium_message)
+
+        # Generate detailed analysis (≤400 words)
+        detailed_prompt = f"""
+        Analyze this legal case and provide a DETAILED ANALYSIS in exactly 400 words or less:
+
+        Case Title: {case_title}
+        Case Text: {case_text[:5000]}...
+
+        Include: Background, legal issues, detailed facts, court's analysis, reasoning, decision, precedents cited, and future implications.
+        """
+        
+        detailed_message = UserMessage(text=detailed_prompt)
+        detailed_analysis = await chat.send_message(detailed_message)
+
+        # Generate tags
+        tags_prompt = f"""
+        Based on this legal case, provide exactly 3-5 relevant tags as a comma-separated list:
+
+        Case Title: {case_title}
+        Case Text: {case_text[:1500]}...
+
+        Examples: ITC, Penalty, Input Tax Credit, CGST, Appeals, etc.
+        Respond with ONLY the comma-separated tags, no additional text.
+        """
+        
+        tags_message = UserMessage(text=tags_prompt)
+        tags_response = await chat.send_message(tags_message)
+        tags = [tag.strip() for tag in tags_response.split(',')]
+
+        # Generate outcome
+        outcome_prompt = f"""
+        Determine the outcome of this legal case. Respond with EXACTLY one of these phrases:
+        "For Assessee" OR "For Revenue"
+
+        Case Title: {case_title}
+        Case Text: {case_text[:2000]}...
+
+        Respond with ONLY the outcome phrase, no additional text.
+        """
+        
+        outcome_message = UserMessage(text=outcome_prompt)
+        outcome = await chat.send_message(outcome_message)
+
+        return {
+            "short_summary": short_summary.strip(),
+            "medium_summary": medium_summary.strip(),
+            "detailed_analysis": detailed_analysis.strip(),
+            "tags": tags,
+            "outcome": outcome.strip()
+        }
+
+    except Exception as e:
+        logging.error(f"AI summary generation failed: {str(e)}")
+        return {
+            "short_summary": "AI summary generation failed",
+            "medium_summary": "AI summary generation failed", 
+            "detailed_analysis": "AI summary generation failed",
+            "tags": ["Error"],
+            "outcome": "Analysis Pending"
+        }
+
+async def generate_ai_draft(summary_text: str, draft_type: str = "reply"):
+    """Generate AI draft from case summary"""
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"ai_draft_{uuid.uuid4()}",
+            system_message="You are an expert legal drafting assistant. Create professional, well-structured legal documents."
+        ).with_model("openai", "gpt-5")
+
+        draft_prompt = f"""
+        Based on this case summary, generate a professional legal {draft_type} draft:
+
+        Case Summary: {summary_text}
+
+        Requirements:
+        1. Use formal legal language and structure
+        2. Include proper legal citations format
+        3. Keep it concise but comprehensive (300-500 words)
+        4. Include relevant legal provisions
+        5. Maintain professional tone throughout
+
+        Generate a complete {draft_type} draft:
+        """
+        
+        draft_message = UserMessage(text=draft_prompt)
+        draft_response = await chat.send_message(draft_message)
+
+        return draft_response.strip()
+
+    except Exception as e:
+        logging.error(f"AI draft generation failed: {str(e)}")
+        return "AI draft generation failed. Please try again later."
+
 # Auth Routes
 @api_router.post("/auth/register")
 async def register_user(user_data: UserCreate):
