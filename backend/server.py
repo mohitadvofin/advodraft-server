@@ -95,6 +95,13 @@ class CaseBulkImport(BaseModel):
     section: str
     text: str
 
+class AISummaryRequest(BaseModel):
+    case_id: str
+
+class AIDraftRequest(BaseModel):
+    summary_text: str
+    draft_type: str = "reply"  # reply, petition, application
+
 class Subscription(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
